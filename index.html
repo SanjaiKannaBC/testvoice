@@ -1,5 +1,372 @@
-<!DOCTYPE html>
-<html><head><title>Voice Bot</title></head>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sanjai — Voice Agent</title>
+<link rel="stylesheet" href="/_static/style.css" />
+<style>
+  /* Inline CSS (keeps everything self-contained). You can move to style.css if desired. */
+  :root{--bg:#f4f7fb;--card:#fff;--muted:#6b7280;--accent:#0f9d58;--accent-2:#e8faf0}
+  body{margin:0;font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:#081226}
+  .container{max-width:1120px;margin:22px auto;padding:18px;display:flex;gap:18px}
+  .panel{background:var(--card);padding:18px;border-radius:12px;border:1px solid #e6eef6;box-shadow:0 6px 20px rgba(16,24,40,0.04)}
+  .left{flex:1}
+  .right{width:360px}
+  .header{display:flex;align-items:center;gap:12px;justify-content:space-between}
+  .avatar{width:56px;height:56px;border-radius:12px;background:#dbeef6;color:#033;font-weight:800;display:flex;align-items:center;justify-content:center}
+  h1{margin:0;font-size:18px}
+  .mode{color:var(--muted);font-size:13px}
+  .wave{display:flex;gap:6px;align-items:end;height:44px;margin:18px auto;width:140px;justify-content:center}
+  .bar{width:8px;height:12px;background:#bdefcf;border-radius:4px;animation:bar 1s infinite ease-in-out}
+  .bar:nth-child(2){animation-delay:.12s}
+  .bar:nth-child(3){animation-delay:.24s}
+  .bar:nth-child(4){animation-delay:.36s}
+  .bar:nth-child(5){animation-delay:.48s}
+  @keyframes bar{0%{transform:scaleY(.4)}50%{transform:scaleY(1.6)}100%{transform:scaleY(.6)}}
+  .mic-area{text-align:center;margin-top:6px}
+  .mic-btn{width:110px;height:110px;border-radius:999px;border:none;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:32px;cursor:pointer;box-shadow:0 8px 30px rgba(15,157,88,0.15)}
+  .transcript{margin-top:14px;font-weight:600}
+  textarea#reply{width:100%;min-height:130px;border-radius:10px;border:1px dashed #e6efe6;padding:14px;background:#fbfff9;color:#034;resize:vertical;margin-top:8px}
+  .controls{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  button{padding:9px 12px;border-radius:8px;border:1px solid #eaeef2;background:#fff;cursor:pointer}
+  .btn-primary{background:#007bff;color:#fff;border:none}
+  .btn-danger{background:#ff4757;color:#fff;border:none}
+  .toggle{background:#f3f4f6}
+  .small{font-size:13px;color:var(--muted)}
+  .history{max-height:640px;overflow:auto;padding-right:6px;margin-top:6px}
+  .bubble-user{background:#fff;border:1px solid #eef2f6;padding:12px;border-radius:14px;max-width:76%;margin-left:auto;font-size:14px}
+  .bubble-bot{background:#eaf8f0;padding:12px;border-radius:14px;max-width:76%;font-size:14px}
+  .suggested{margin-top:16px}
+  .sugg-btn{display:block;width:100%;text-align:left;padding:10px;border-radius:8px;background:#f6f7fb;border:1px solid #eef2f6;margin-bottom:8px}
+  .key-row{display:flex;gap:8px;align-items:center;margin-top:8px}
+  input.key{flex:1;padding:9px;border-radius:8px;border:1px solid #e6eef6}
+  .note{font-size:13px;color:var(--muted);margin-top:8px}
+  .footer{margin-top:14px;font-size:13px;color:var(--muted)}
+  @media (max-width:980px){.container{flex-direction:column}.right{width:100%}}
+</style>
+</head>
 <body>
-<h1>Cloudflare Deployment Placeholder</h1>
-</body></html>
+
+<div class="container">
+  <div class="left panel">
+    <div class="header">
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="avatar">SKB</div>
+        <div>
+          <h1>Sanjai — Voice Agent</h1>
+          <div class="mode small">Mode: <span id="modeText">warm</span></div>
+        </div>
+      </div>
+      <div>
+        <button id="clearAll">Clear</button>
+      </div>
+    </div>
+
+    <div class="wave" aria-hidden="true">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    </div>
+
+    <div class="mic-area">
+      <button id="micBtn" class="mic-btn" title="Click to speak">🎤</button>
+    </div>
+
+    <div class="transcript small">You said: <span id="transcriptText">—</span></div>
+
+    <textarea id="reply" readonly placeholder="Bot response will appear here..."></textarea>
+
+    <div class="controls">
+      <button id="speakBtn" class="btn-primary">Speak</button>
+      <button id="stopSpeakBtn" class="btn-danger" disabled>Stop Speaking</button>
+      <button id="autoSpeak" class="toggle">Auto-speak: On</button>
+      <button id="chime" class="toggle">Chime: On</button>
+    </div>
+
+    <div class="footer small">
+      Chime plays before speaking. Auto-speak will automatically vocalize answers. The backend runs under <code>/api/generate</code> (key stored on server).
+    </div>
+  </div>
+
+  <div class="right panel">
+    <h3>Conversation History</h3>
+    <div class="history" id="history"></div>
+
+    <div style="margin-top:12px">
+      <h4>Suggested</h4>
+      <button class="sugg-btn">Tell me about your background</button>
+      <button class="sugg-btn">What is your #1 superpower?</button>
+      <button class="sugg-btn">Top 3 growth areas</button>
+      <button class="sugg-btn">How do you push your boundaries?</button>
+      <button class="sugg-btn">What misconception do your coworkers have?</button>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="small" style="margin-bottom:6px">Paste your Gemini API key (optional — for local testing only)</div>
+      <div class="key-row">
+        <input id="devKey" class="key" placeholder="Paste key for local testing (optional)">
+        <button id="saveDevKey">Save Key</button>
+      </div>
+      <div class="note">If deployed on Vercel with an env var `GOOGLE_API_KEY`, you do NOT need to paste a key here. The server function will use the secret.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/*
+  index.html (improved UI) - interacts with serverless function at /api/generate
+  - The server is responsible for calling Gemini; front-end does NOT include the API key when deployed properly.
+  - For local testing without a server, you may paste a key in the right-side box (dev only).
+*/
+
+/* DOM references */
+const micBtn = document.getElementById('micBtn');
+const transcriptText = document.getElementById('transcriptText');
+const replyEl = document.getElementById('reply');
+const historyEl = document.getElementById('history');
+const speakBtn = document.getElementById('speakBtn');
+const stopSpeakBtn = document.getElementById('stopSpeakBtn');
+const autoSpeakBtn = document.getElementById('autoSpeak');
+const chimeBtn = document.getElementById('chime');
+const clearAllBtn = document.getElementById('clearAll');
+const modeText = document.getElementById('modeText');
+
+const saveDevKeyBtn = document.getElementById('saveDevKey');
+const devKeyInput = document.getElementById('devKey');
+
+let savedDevKey = null;
+let autoSpeak = true;
+let chimeOn = true;
+let currentUtterance = null;
+
+/* Speech recognition setup */
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.lang = 'en-IN';
+  recognition.interimResults = false;
+  recognition.continuous = false;
+
+  recognition.onresult = (ev) => {
+    const text = ev.results[0][0].transcript.trim();
+    transcriptText.textContent = text;
+    handleUserText(text);
+  };
+  recognition.onerror = (e) => {
+    console.warn('Recognition error', e);
+  };
+  recognition.onend = () => {
+    micBtn.style.transform = '';
+  };
+} else {
+  // If not supported
+  micBtn.disabled = true;
+  micBtn.title = 'Speech recognition not supported on this browser';
+}
+
+/* Mic button */
+micBtn.addEventListener('click', () => {
+  if (!recognition) return;
+  try {
+    recognition.start();
+    micBtn.style.transform = 'scale(0.96)';
+    transcriptText.textContent = 'Listening...';
+  } catch (e) {
+    console.warn(e);
+  }
+});
+
+/* Save dev key for local testing */
+saveDevKeyBtn.addEventListener('click', () => {
+  const v = devKeyInput.value.trim();
+  if (!v) { alert('Paste a key to save.'); return; }
+  savedDevKey = v;
+  devKeyInput.value = '';
+  devKeyInput.placeholder = 'Key saved in memory';
+  showToast('Dev key saved in memory (session only)');
+});
+
+/* Suggested buttons */
+document.querySelectorAll('.sugg-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    const q = b.textContent.trim();
+    transcriptText.textContent = q;
+    handleUserText(q);
+  });
+});
+
+/* Clear history */
+clearAllBtn.addEventListener('click', () => {
+  historyEl.innerHTML = '';
+  transcriptText.textContent = '—';
+  replyEl.value = '';
+});
+
+/* toggles */
+autoSpeakBtn.addEventListener('click', () => {
+  autoSpeak = !autoSpeak;
+  autoSpeakBtn.textContent = `Auto-speak: ${autoSpeak ? 'On' : 'Off'}`;
+});
+chimeBtn.addEventListener('click', () => {
+  chimeOn = !chimeOn;
+  chimeBtn.textContent = `Chime: ${chimeOn ? 'On' : 'Off'}`;
+});
+
+/* speak control */
+speakBtn.addEventListener('click', () => {
+  speakText(replyEl.value);
+});
+stopSpeakBtn.addEventListener('click', () => {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  stopSpeakBtn.disabled = true;
+});
+
+/* append history */
+function appendHistory(user, text, role='bot') {
+  const wrap = document.createElement('div');
+  const bubble = document.createElement('div');
+  bubble.className = role === 'user' ? 'bubble-user' : 'bubble-bot';
+  bubble.innerHTML = `<strong style="display:block;margin-bottom:8px">${user}</strong>` + escapeHtml(text);
+  wrap.appendChild(bubble);
+  historyEl.appendChild(wrap);
+  historyEl.scrollTop = historyEl.scrollHeight;
+}
+
+/* core: user text -> call /api/generate -> show reply -> speak if enabled */
+async function handleUserText(text) {
+  if (!text) return;
+  appendHistory('You', text, 'user');
+  replyEl.value = 'Thinking...';
+  // mode detection
+  const mode = detectMode(text);
+  modeText.textContent = mode;
+
+  // send to serverless endpoint
+  try {
+    // When deployed on Vercel: /api/generate will use the secure env var GOOGLE_API_KEY
+    // For local testing without server, developer can save a key in the UI (savedDevKey)
+    const endpoint = '/api/generate';
+    const payload = { text };
+
+    // If savedDevKey is present and site is local (no origin check), we attempt client-side fall-back
+    let useFallbackKey = false;
+    if (!isDeployed() && savedDevKey) useFallbackKey = true;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    // If server returns 404/500 (no backend), attempt direct client call (developer testing) using savedDevKey
+    let data;
+    if (!res.ok) {
+      // fallback direct client-side call for local dev/testing (not for production)
+      if (useFallbackKey) {
+        data = await callGeminiDirectly(text, savedDevKey);
+      } else {
+        const txt = await res.text();
+        throw new Error(`Server error: ${res.status} ${txt}`);
+      }
+    } else {
+      data = await res.json();
+    }
+
+    const reply = data?.reply || 'I didn\\'t catch that. Could you repeat?';
+    replyEl.value = reply;
+    appendHistory('Sanjai', reply, 'bot');
+
+    if (chimeOn) playChime();
+    if (autoSpeak) speakText(reply);
+
+  } catch (err) {
+    console.error(err);
+    const message = 'Error: ' + (err.message || err);
+    replyEl.value = message;
+    appendHistory('Sanjai', message, 'bot');
+  }
+}
+
+/* direct Gemini call for dev fallback (only when no server) */
+async function callGeminiDirectly(text, apiKey) {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const system = `You are a concise conversational assistant answering as Sanjai. Speak in short, natural sentences suitable for voice.`;
+  const body = {
+    contents: [
+      { parts: [{ text: system }, { text: 'User: ' + text }] }
+    ],
+    generationConfig: { temperature: 0.3, maxOutputTokens: 300 }
+  };
+  const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`LLM request failed: ${r.status} ${txt}`);
+  }
+  const d = await r.json();
+  let out = null;
+  try {
+    out = (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) ? d.candidates[0].content.parts.map(p => p.text || '').join(' ').trim() : null;
+  } catch(e){}
+  return { reply: out || 'I didn\\'t catch that.' };
+}
+
+/* TTS */
+function speakText(text) {
+  if (!text) return;
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-US';
+  u.rate = 1.0;
+  u.pitch = 1.0;
+  currentUtterance = u;
+  stopSpeakBtn.disabled = false;
+  u.onend = () => stopSpeakBtn.disabled = true;
+  window.speechSynthesis.speak(u);
+}
+
+/* chime (tiny beep) */
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = 880;
+    g.gain.value = 0.0001;
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + 0.01);
+    setTimeout(()=> {
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+      o.stop(ctx.currentTime + 0.1);
+      ctx.close();
+    }, 120);
+  } catch(e){}
+}
+
+/* simple mode detection */
+function detectMode(text) {
+  const t = (text||'').toLowerCase();
+  if (/\bslow\b|\bcalm\b/.test(t)) return 'slow';
+  if (/\benergi|\bexcite/.test(t)) return 'energetic';
+  if (/\bbackground\b|\babout yourself/.test(t)) return 'relaxed';
+  if ((t.split(/\s+/).length||0) > 30) return 'slow';
+  return 'warm';
+}
+
+/* check if deployed (heuristic: origin contains vercel or pages) */
+function isDeployed() {
+  try {
+    const host = location.hostname || '';
+    if (host.includes('vercel.app') || host.endsWith('pages.dev') || host.includes('github.io')) return true;
+  } catch(e){}
+  return false;
+}
+
+function escapeHtml(s){return String(s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('\n','<br>');}
+function showToast(msg, t=2000){const el=document.createElement('div');el.style.position='fixed';el.style.left='50%';el.style.transform='translateX(-50%)';el.style.bottom='18px';el.style.padding='10px 14px';el.style.background='#111';el.style.color='#fff';el.style.borderRadius='8px';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),t)}
+</script>
+</body>
+</html>
